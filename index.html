@@ -23,6 +23,57 @@
             flex-direction: column;
             align-items: center;
             padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        .date-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.8);
+            background: rgba(0, 0, 0, 0.2);
+            padding: 8px 15px;
+            border-radius: 20px;
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .snowflake {
+            position: fixed;
+            top: -10px;
+            color: #fff;
+            font-size: 1em;
+            text-shadow: 0 0 5px #000;
+            animation: fall linear forwards;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        @keyframes fall {
+            to { transform: translateY(105vh); }
+        }
+
+        .download-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            margin-left: 10px;
+            transition: 0.3s;
+            display: none;
+            align-items: center;
+            gap: 5px;
+        }
+        .download-btn:hover {
+            background: #8e24d6;
+            transform: scale(1.05);
         }
 
         .container {
@@ -34,6 +85,7 @@
             padding: 30px;
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 25px 45px rgba(0,0,0,0.2);
+            z-index: 10;
         }
 
         header { text-align: center; margin-bottom: 30px; }
@@ -70,12 +122,15 @@
         .stat-label { font-size: 14px; color: #aaa; display: block; margin-bottom: 5px; text-transform: uppercase; }
         .stat-value { font-size: 32px; font-weight: bold; color: #fff; }
 
+        .stat-content-wrapper { display: flex; flex-direction: column; align-items: center; }
+        .download-wrapper { margin-top: 10px; }
+
         .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         
         .input-header {
             display: flex;
             align-items: center;
-            gap: 10px;
+            justify-content: space-between;
             margin-bottom: 10px;
             font-weight: 600;
             color: var(--secondary);
@@ -83,7 +138,18 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        .input-header i { font-size: 18px; }
+        .input-title { display: flex; align-items: center; gap: 10px; }
+        .clear-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: #ff4d4d;
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            transition: 0.3s;
+        }
+        .clear-btn:hover { background: rgba(255, 77, 77, 0.2); }
 
         textarea {
             width: 100%;
@@ -133,6 +199,8 @@
 </head>
 <body>
 
+<div class="date-display" id="currentDate"></div>
+
 <div class="container">
     <header>
         <h1><i class="fab fa-instagram"></i> LetMeCheck<span>+</span></h1>
@@ -150,22 +218,31 @@
 
     <div class="stats-grid">
         <div class="stat-card">
-            <span class="stat-label">Seni Takip Etmeyen</span>
-            <span id="unfollowerCount" class="stat-value">0</span>
+            <div class="stat-content-wrapper">
+                <span class="stat-label">Seni Takip Etmeyen</span>
+                <span id="unfollowerCount" class="stat-value">0</span>
+                <div class="download-wrapper">
+                    <button id="downloadBtn" class="download-btn" onclick="downloadTxt()">
+                        <i class="fas fa-file-download"></i> Listeyi İndir (TXT)
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="main-grid">
         <div class="input-card">
             <div class="input-header">
-                <i class="fas fa-user-check"></i> Takipçiler 
+                <div class="input-title"><i class="fas fa-user-check"></i> Takipçiler</div>
+                <button class="clear-btn" onclick="clearInput('followersInput')"><i class="fas fa-trash"></i> Temizle</button>
             </div>
             <textarea id="followersInput" placeholder="Kopyaladığınız takipçiler listesini buraya yapıştırın..."></textarea>
         </div>
 
         <div class="input-card">
             <div class="input-header">
-                <i class="fas fa-users-cog"></i> Takip Edilenler 
+                <div class="input-title"><i class="fas fa-users-cog"></i> Takip Edilenler</div>
+                <button class="clear-btn" onclick="clearInput('followingInput')"><i class="fas fa-trash"></i> Temizle</button>
             </div>
             <textarea id="followingInput" placeholder="Kopyaladığınız takip edilenler listesini buraya yapıştırın..."></textarea>
         </div>
@@ -179,12 +256,54 @@
 </div>
 
 <footer>
-    <p>&copy; 2026 LetMeCheck+. Tüm Hakları Saklıdır.</p>
+    <p>&copy; Copyright © 2026 LetMeCheck+. Tüm Hakları Saklıdır.</p>
 </footer>
 
 <script>
     const followingInput = document.getElementById('followingInput');
     const followersInput = document.getElementById('followersInput');
+    const downloadBtn = document.getElementById('downloadBtn');
+    let currentUnfollowers = [];
+
+    function updateDate() {
+        const dateElement = document.getElementById('currentDate');
+        const now = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        dateElement.innerText = now.toLocaleDateString('tr-TR', options);
+    }
+    updateDate();
+
+    function createSnowflake() {
+        const snowflake = document.createElement('i');
+        snowflake.classList.add('far', 'fa-snowflake', 'snowflake');
+        snowflake.style.left = Math.random() * window.innerWidth + 'px';
+        snowflake.style.animationDuration = Math.random() * 3 + 2 + 's';
+        snowflake.style.opacity = Math.random();
+        snowflake.style.fontSize = Math.random() * 10 + 10 + 'px';
+        document.body.appendChild(snowflake);
+        setTimeout(() => { snowflake.remove(); }, 5000);
+    }
+    setInterval(createSnowflake, 200);
+
+    function clearInput(id) {
+        document.getElementById(id).value = '';
+        runAnalysis();
+    }
+
+    function downloadTxt() {
+        if (currentUnfollowers.length === 0) return;
+        let content = "LetMeCheck+ - Seni Takip Etmeyenler Listesi\n----------------------------------------\n";
+        content += `Tarih: ${new Date().toLocaleDateString('tr-TR')}\nToplam: ${currentUnfollowers.length} Kişi\n\n`;
+        currentUnfollowers.forEach(user => { content += `@${user}\n`; });
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `takip_etmeyenler_${new Date().toISOString().slice(0,10)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
 
     function runAnalysis() {
         const parseData = (text) => {
@@ -193,28 +312,32 @@
                 .filter(item => {
                     const isNotEmpty = item !== "";
                     const hasNoSpace = !item.includes(" ");
-                    const isNotJustDot = item !== ".";
                     const isStrictlyValid = /^[a-zA-Z0-9._]+$/.test(item);
-                    return isNotEmpty && hasNoSpace && isNotJustDot && isStrictlyValid;
+                    return isNotEmpty && hasNoSpace && isStrictlyValid;
                 });
         };
 
         const followers = parseData(followersInput.value);
         const following = parseData(followingInput.value);
 
-        // Takip edilenler içinde olup takipçiler içinde olmayanlar
-        const unfollowers = following.filter(user => !followers.includes(user));
-        document.getElementById('unfollowerCount').innerText = unfollowers.length;
+        currentUnfollowers = following.filter(user => !followers.includes(user));
+        document.getElementById('unfollowerCount').innerText = currentUnfollowers.length;
 
         const listUI = document.getElementById('unfollowerList');
         listUI.innerHTML = "";
 
-        if (unfollowers.length === 0 && following.length > 0) {
+        if (currentUnfollowers.length > 0) {
+            downloadBtn.style.display = "flex";
+        } else {
+            downloadBtn.style.display = "none";
+        }
+
+        if (currentUnfollowers.length === 0 && following.length > 0) {
             listUI.innerHTML = '<div class="no-result">Harika! Herkes seni geri takip ediyor.</div>';
         } else if (following.length === 0) {
             listUI.innerHTML = '<div class="no-result">Verileri girdiğinizde analiz anlık olarak burada görünecektir.</div>';
         } else {
-            unfollowers.forEach(user => {
+            currentUnfollowers.forEach(user => {
                 const li = document.createElement('li');
                 li.innerHTML = `<span>@${user}</span> <small style="color:#fd1d1d">Seni Takip Etmiyor</small>`;
                 listUI.appendChild(li);
